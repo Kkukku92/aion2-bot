@@ -246,44 +246,6 @@ class VoteButton(Button):
         self.view_ref = view
 
     async def callback(self, interaction: discord.Interaction):
-        user = interaction.user
-
-        # 중복 투표 방지
-        for voters in self.view_ref.votes.values():
-            if user.id in voters:
-                await interaction.response.send_message(
-                    "이미 투표했습니다.", ephemeral=True
-                )
-                return
-
-        self.view_ref.votes[self.label].append(user.id)
-
-        result = "\n".join(
-            f"{k}: {len(v)}표" for k, v in self.view_ref.votes.items()
-        )
-
-        await interaction.response.edit_message(
-            content=f"📊 **투표 진행 중**\n\n{result}",
-            view=self.view_ref
-        )
-
-@bot.command()
-async def 투표(ctx, question, *options):
-    if len(options) < 2:
-        await ctx.send("선택지는 최소 2개 이상이어야 합니다.")
-        return
-
-    view = VoteView(options)
-    result = "\n".join(f"{opt}: 0표" for opt in options)
-
-    await ctx.send(
-        f"📊 **투표: {question}**\n\n{result}",
-        view=view
-    )
-
-#중복투표
-
-async def callback(self, interaction: discord.Interaction):
     user = interaction.user
 
     # 지금까지 이 유저가 투표한 총 횟수 계산
@@ -317,6 +279,21 @@ async def callback(self, interaction: discord.Interaction):
         view=self.view_ref
     )
 
+
+
+@bot.command()
+async def 투표(ctx, question, *options):
+    if len(options) < 2:
+        await ctx.send("선택지는 최소 2개 이상이어야 합니다.")
+        return
+
+    view = VoteView(options)
+    result = "\n".join(f"{opt}: 0표" for opt in options)
+
+    await ctx.send(
+        f"📊 **투표: {question}**\n\n{result}",
+        view=view
+    )
 
 
 # ======================
@@ -354,4 +331,5 @@ async def 도움말(ctx):
 # 봇 실행
 # ======================
 bot.run(os.getenv("DISCORD_TOKEN"))
+
 
