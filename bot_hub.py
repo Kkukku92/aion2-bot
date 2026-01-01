@@ -232,6 +232,17 @@ async def 아툴(ctx):
 # !투표
 # ======================
 
+class VoteView(View):
+    def __init__(self, options):
+        super().__init__(timeout=None)
+
+        # 각 선택지별 투표자 목록
+        self.votes = {opt: [] for opt in options}
+
+        for opt in options:
+            self.add_item(VoteButton(opt, self))
+
+
 class VoteButton(Button):
     def __init__(self, label, view):
         super().__init__(label=label, style=discord.ButtonStyle.primary)
@@ -323,6 +334,7 @@ async def 도움말(ctx):
 # 봇 실행
 # ======================
 bot.run(os.getenv("DISCORD_TOKEN"))
+
 
 
 
