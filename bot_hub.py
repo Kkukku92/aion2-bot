@@ -232,52 +232,44 @@ async def 아툴(ctx):
 # !투표
 # ======================
 
-class VoteView(View):
-    def __init__(self, options):
-        super().__init__(timeout=None)
-        self.votes = {opt: [] for opt in options}
-
-        for opt in options:
-            self.add_item(VoteButton(opt, self))
-
 class VoteButton(Button):
     def __init__(self, label, view):
         super().__init__(label=label, style=discord.ButtonStyle.primary)
         self.view_ref = view
-        
+
     async def callback(self, interaction: discord.Interaction):
-    user = interaction.user
+        user = interaction.user
 
-    # 지금까지 이 유저가 투표한 총 횟수 계산
-    total_votes = sum(
-        user.id in voters for voters in self.view_ref.votes.values()
-    )
-
-    if total_votes >= 2:
-        await interaction.response.send_message(
-            "최대 2개까지만 투표할 수 있습니다.",
-            ephemeral=True
+        # 지금까지 이 유저가 투표한 총 횟수
+        total_votes = sum(
+            user.id in voters for voters in self.view_ref.votes.values()
         )
-        return
 
-    # 현재 버튼에 이미 투표했는지 확인 (같은 항목 중복 방지)
-    if user.id in self.view_ref.votes[self.label]:
-        await interaction.response.send_message(
-            "이 항목에는 이미 투표했습니다.",
-            ephemeral=True
+        if total_votes >= 2:
+            await interaction.response.send_message(
+                "최대 2개까지만 투표할 수 있습니다.",
+                ephemeral=True
+            )
+            return
+
+        # 같은 항목 중복 투표 방지
+        if user.id in self.view_ref.votes[self.label]:
+            await interaction.response.send_message(
+                "이 항목에는 이미 투표했습니다.",
+                ephemeral=True
+            )
+            return
+
+        self.view_ref.votes[self.label].append(user.id)
+
+        result = "\n".join(
+            f"{k}: {len(v)}표" for k, v in self.view_ref.votes.items()
         )
-        return
 
-    self.view_ref.votes[self.label].append(user.id)
-
-    result = "\n".join(
-        f"{k}: {len(v)}표" for k, v in self.view_ref.votes.items()
-    )
-
-    await interaction.response.edit_message(
-        content=f"📊 **투표 진행 중**\n\n{result}",
-        view=self.view_ref
-    )
+        await interaction.response.edit_message(
+            content=f"📊 **투표 진행 중**\n\n{result}",
+            view=self.view_ref
+        )
 
 
 
@@ -331,6 +323,7 @@ async def 도움말(ctx):
 # 봇 실행
 # ======================
 bot.run(os.getenv("DISCORD_TOKEN"))
+
 
 
 
