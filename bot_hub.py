@@ -244,7 +244,7 @@ class VoteButton(Button):
     def __init__(self, label, view):
         super().__init__(label=label, style=discord.ButtonStyle.primary)
         self.view_ref = view
-
+        
     async def callback(self, interaction: discord.Interaction):
     user = interaction.user
 
@@ -331,5 +331,6 @@ async def 도움말(ctx):
 # 봇 실행
 # ======================
 bot.run(os.getenv("DISCORD_TOKEN"))
+
 
 
