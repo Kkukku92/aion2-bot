@@ -281,6 +281,44 @@ async def 투표(ctx, question, *options):
         view=view
     )
 
+#중복투표
+
+async def callback(self, interaction: discord.Interaction):
+    user = interaction.user
+
+    # 지금까지 이 유저가 투표한 총 횟수 계산
+    total_votes = sum(
+        user.id in voters for voters in self.view_ref.votes.values()
+    )
+
+    if total_votes >= 2:
+        await interaction.response.send_message(
+            "최대 2개까지만 투표할 수 있습니다.",
+            ephemeral=True
+        )
+        return
+
+    # 현재 버튼에 이미 투표했는지 확인 (같은 항목 중복 방지)
+    if user.id in self.view_ref.votes[self.label]:
+        await interaction.response.send_message(
+            "이 항목에는 이미 투표했습니다.",
+            ephemeral=True
+        )
+        return
+
+    self.view_ref.votes[self.label].append(user.id)
+
+    result = "\n".join(
+        f"{k}: {len(v)}표" for k, v in self.view_ref.votes.items()
+    )
+
+    await interaction.response.edit_message(
+        content=f"📊 **투표 진행 중**\n\n{result}",
+        view=self.view_ref
+    )
+
+
+
 # ======================
 # !도움말
 # ======================
@@ -316,3 +354,4 @@ async def 도움말(ctx):
 # 봇 실행
 # ======================
 bot.run(os.getenv("DISCORD_TOKEN"))
+
