@@ -194,4 +194,5 @@ async def 도움말(ctx):
     )
 
 # ===== 봇 실행 =====
-bot.run("YOUR_DISCORD_BOT_TOKEN")
+bot.run(os.getenv("DISCORD_TOKEN"))
+
