@@ -226,21 +226,27 @@ async def 디시(ctx):
 
 @bot.command()
 async def 아툴(ctx):
-    await ctx.send("🛠 AION2 Tool\n👉 https://aion2.tool.com")
+    await ctx.send("🛠 AION2 Tool\n👉 https://aion2tool.com")
 
 # ======================
 # !투표
 # ======================
 
 class VoteView(View):
-    def __init__(self, options):
+    def __init__(self, options, author_id):
         super().__init__(timeout=None)
 
-        # 각 선택지별 투표자 목록
-        self.votes = {opt: [] for opt in options}
+        self.author_id = author_id      # 투표 만든 사람
+        self.closed = False             # 종료 여부
+
+        # {옵션: {user_id: 닉네임}}
+        self.votes = {opt: {} for opt in options}
 
         for opt in options:
             self.add_item(VoteButton(opt, self))
+
+        # 종료 버튼 추가
+        self.add_item(EndVoteButton(self))
 
 
 class VoteButton(Button):
@@ -249,9 +255,16 @@ class VoteButton(Button):
         self.view_ref = view
 
     async def callback(self, interaction: discord.Interaction):
-        user = interaction.user
+        if self.view_ref.closed:
+            await interaction.response.send_message(
+                "이미 종료된 투표입니다.",
+                ephemeral=True
+            )
+            return
 
-        # 지금까지 이 유저가 투표한 총 횟수
+        user = interaction.user
+        nickname = user.display_name
+
         total_votes = sum(
             user.id in voters for voters in self.view_ref.votes.values()
         )
@@ -263,7 +276,6 @@ class VoteButton(Button):
             )
             return
 
-        # 같은 항목 중복 투표 방지
         if user.id in self.view_ref.votes[self.label]:
             await interaction.response.send_message(
                 "이 항목에는 이미 투표했습니다.",
@@ -271,17 +283,62 @@ class VoteButton(Button):
             )
             return
 
-        self.view_ref.votes[self.label].append(user.id)
-
-        result = "\n".join(
-            f"{k}: {len(v)}표" for k, v in self.view_ref.votes.items()
-        )
+        self.view_ref.votes[self.label][user.id] = nickname
 
         await interaction.response.edit_message(
-            content=f"📊 **투표 진행 중**\n\n{result}",
+            content=self.make_result_text(),
             view=self.view_ref
         )
 
+    def make_result_text(self):
+        lines = []
+        for opt, voters in self.view_ref.votes.items():
+            if voters:
+                names = ", ".join(voters.values())
+                lines.append(f"**{opt}** : {len(voters)}표\n└ {names}")
+            else:
+                lines.append(f"**{opt}** : 0표")
+        return "📊 **투표 진행 중**\n\n" + "\n".join(lines)
+
+class EndVoteButton(Button):
+    def __init__(self, view):
+        super().__init__(
+            label="투표 종료",
+            style=discord.ButtonStyle.danger
+        )
+        self.view_ref = view
+
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.view_ref.author_id:
+            await interaction.response.send_message(
+                "투표를 만든 사람만 종료할 수 있습니다.",
+                ephemeral=True
+            )
+            return
+
+        self.view_ref.closed = True
+
+        # 모든 버튼 비활성화
+        for item in self.view_ref.children:
+            item.disabled = True
+
+        await interaction.response.edit_message(
+            content=self.make_final_result(),
+            view=self.view_ref
+        )
+
+    def make_final_result(self):
+        lines = []
+        for opt, voters in self.view_ref.votes.items():
+            if voters:
+                names = ", ".join(voters.values())
+                lines.append(
+                    f"**{opt}** : {len(voters)}표\n└ {names}"
+                )
+            else:
+                lines.append(f"**{opt}** : 0표")
+
+        return "🛑 **투표 종료! 최종 결과**\n\n" + "\n".join(lines)
 
 
 @bot.command()
@@ -290,13 +347,15 @@ async def 투표(ctx, question, *options):
         await ctx.send("선택지는 최소 2개 이상이어야 합니다.")
         return
 
-    view = VoteView(options)
-    result = "\n".join(f"{opt}: 0표" for opt in options)
+    view = VoteView(options, ctx.author.id)
+
+    result = "\n".join(f"**{opt}** : 0표" for opt in options)
 
     await ctx.send(
         f"📊 **투표: {question}**\n\n{result}",
         view=view
     )
+
 
 
 # ======================
@@ -334,8 +393,4 @@ async def 도움말(ctx):
 # 봇 실행
 # ======================
 bot.run(os.getenv("DISCORD_TOKEN"))
-
-
-
-
 
