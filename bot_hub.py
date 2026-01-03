@@ -3,6 +3,9 @@ from discord.ext import commands
 import json
 import os
 from discord.ui import View, Button
+import requests
+from bs4 import BeautifulSoup
+
 
 # ======================
 # 기본 설정
@@ -225,8 +228,39 @@ async def 디시(ctx):
     await ctx.send("📌 디시인사이드 아이온2 갤러리\n👉 https://gall.dcinside.com/mgallery/board/lists/?id=aion2")
 
 @bot.command()
-async def 아툴(ctx):
-    await ctx.send("🛠 AION2 Tool\n👉 https://aion2tool.com")
+async def 아툴(ctx, *, nickname: str):
+    server_id = 1005
+    url = f"https://aion2tool.com/char/serverid={server_id}/{nickname}"
+
+    headers = {
+        "User-Agent": "Mozilla/5.0"
+    }
+
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+
+        if response.status_code != 200:
+            await ctx.send("❌ 캐릭터 정보를 불러오지 못했습니다.")
+            return
+
+        soup = BeautifulSoup(response.text, "html.parser")
+
+        # ✅ 전투력 div (id로 정확히 찾음)
+        power_div = soup.find("div", id="dps-score-value")
+
+        if not power_div:
+            await ctx.send("❌ 전투력 정보를 찾을 수 없습니다.")
+            return
+
+        power = power_div.get_text(strip=True)
+
+        await ctx.send(
+            f"🔍 **{nickname}** 전투력\n"
+            f"⚔️ `{power}`"
+        )
+
+    except Exception as e:
+        await ctx.send("❌ 전투력 조회 중 오류가 발생했습니다.")
 
 # ======================
 # !투표
@@ -384,7 +418,7 @@ async def 도움말(ctx):
 
 [유틸]
 !디시 - 아이온2 갤러리
-!아툴 - AION2 툴 사이트
+!아툴 닉네임 - 자신의 아툴 전투력 검색 (현재유스티엘서버만가능)
 
 ※ 확정 8명 + 일정 등록 시 자동 공지됩니다.
 """)
