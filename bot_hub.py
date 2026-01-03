@@ -7,11 +7,9 @@ import hashlib
 import json
 import os
 from discord.ui import View, Button
-import asyncio
 import requests
 from bs4 import BeautifulSoup
-import time
-import functools
+from datetime import datetime, timedelta
 
 
 # ======================
@@ -27,8 +25,6 @@ DATA_FILE = "raid_data.json"
 
 MAX_PARTICIPANTS = 8
 MAX_RESERVE = 2
-
-refresh_cooldowns = {}  # {user_id: last_refresh_time}
 
 # ======================
 # 데이터 불러오기 / 저장
@@ -49,13 +45,6 @@ def save_data():
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 data = load_data()
-
-async def run_blocking(func, *args):
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(
-        None,
-        functools.partial(func, *args)
-    )
 
 # ======================
 # 자동 공지 체크
@@ -244,88 +233,6 @@ async def 디시(ctx):
     await ctx.send("📌 디시인사이드 아이온2 갤러리\n👉 https://gall.dcinside.com/mgallery/board/lists/?id=aion2")
 
 # ===== 아툴 =====
-
-# ===== 갱신 =====
-def update_aion2_character(character_id: str):
-    url = "https://aion2tool.com/api/character/update-info"
-
-    payload = {
-        "race": 1,
-        "server_id": 1005,
-        "character_id": character_id
-    }
-
-    headers = {
-        "User-Agent": "Mozilla/5.0",
-        "Content-Type": "application/json",
-        "Accept": "application/json"
-    }
-
-    requests.post(url, json=payload, headers=headers, timeout=10)
-
-class AionRefreshView(View):
-    def __init__(self, nickname: str):
-        super().__init__(timeout=120)
-        self.nickname = nickname
-
-    @discord.ui.button(label="🔄 갱신하기", style=discord.ButtonStyle.primary)
-    async def refresh(self, interaction: discord.Interaction, button: Button):
-        user_id = interaction.user.id
-        now = time.time()
-
-        last_time = refresh_cooldowns.get(user_id, 0)
-        remain = 30 - (now - last_time)
-
-        if remain > 0:
-            await interaction.response.send_message(
-                f"⏳ {int(remain)}초 후에 다시 갱신할 수 있어요.",
-                ephemeral=True
-            )
-            return
-
-        # 🔴 무조건 제일 먼저 defer
-        await interaction.response.defer()
-
-        refresh_cooldowns[user_id] = now
-
-        try:
-            # 🔥 requests를 스레드로 실행
-            char = await run_blocking(get_aion2_combat_power, self.nickname)
-            if not char:
-                await interaction.followup.send(
-                    "❌ 캐릭터를 찾을 수 없습니다.",
-                    ephemeral=True
-                )
-                return
-
-            await run_blocking(update_aion2_character, char["character_id"])
-
-            # 서버 반영 대기
-            await asyncio.sleep(5)
-
-            char = await run_blocking(get_aion2_combat_power, self.nickname)
-
-            combat = int(char["combat_score"])
-            combat_max = int(char["combat_score_max"])
-
-            await interaction.message.edit(
-                content=(
-                    f"⚔️ **{char['nickname']} 전투력 정보**\n\n"
-                    f"🔥 전투력: **{combat:,} / {combat_max:,}**"
-                ),
-                view=self
-            )
-
-        except Exception as e:
-            print("갱신 오류:", e)
-            await interaction.followup.send(
-                "⚠️ 갱신 중 오류가 발생했습니다.",
-                ephemeral=True
-            )
-
-
-    
-# ===== 조회 =====
 def get_aion2_combat_power(nickname: str):
     url = "https://aion2tool.com/api/character/search"
 
@@ -352,8 +259,6 @@ def get_aion2_combat_power(nickname: str):
 
     return data["data"]
 
-
-
 @bot.command()
 async def 아툴(ctx, nickname: str):
     char = get_aion2_combat_power(nickname)
@@ -362,22 +267,58 @@ async def 아툴(ctx, nickname: str):
         await ctx.send("❌ 캐릭터 정보를 찾을 수 없습니다.")
         return
 
-    # 최초 갱신
-    update_aion2_character(char["character_id"])
-    await asyncio.sleep(1.5)
+    embed = build_aion_embed(char)
+    await ctx.send(embed=embed)
 
-    char = get_aion2_combat_power(nickname)
+# ===== 갱신
 
-    combat = int(char["combat_score"])
-    combat_max = int(char["combat_score_max"])
-
-    view = AionRefreshView(nickname)
-
-    await ctx.send(
-        f"⚔️ **{char['nickname']} 전투력 정보**\n\n"
-        f"🔥 전투력: **{combat:,} / {combat_max:,}**",
-        view=view
+def is_old_data(updated_at: str) -> bool:
+    updated_time = datetime.fromisoformat(
+        updated_at.replace("Z", "+00:00")
     )
+    return datetime.utcnow() - updated_time > timedelta(hours=6)
+
+def build_aion_embed(char: dict) -> discord.Embed:
+    embed = discord.Embed(
+        title=f"⚔ {char['nickname']}",
+        color=0xA78BFA
+    )
+
+    embed.set_thumbnail(url=char["avatar_url"])
+
+    embed.add_field(
+        name="🔥 전투력",
+        value=(
+            f"**{int(char['combat_score']):,} / "
+            f"{int(char['combat_score_max']):,}**"
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="직업 / 서버",
+        value=f"{char['job']} / {char['server']}",
+        inline=True
+    )
+
+    updated_at = char["score_updated_at"]
+
+    embed.add_field(
+        name="데이터 갱신 시각",
+        value=updated_at.replace("T", " ").replace("Z", ""),
+        inline=False
+    )
+
+    if is_old_data(updated_at):
+        embed.add_field(
+            name="⚠ 주의",
+            value="전투력 데이터가 오래되었을 수 있습니다.\n(Aion2Tool 기준)",
+            inline=False
+        )
+
+    embed.set_footer(text="Data from aion2tool.com")
+
+    return embed
 
 
 # ======================
@@ -591,5 +532,4 @@ async def 도움말(ctx):
 # 봇 실행
 # ======================
 bot.run(os.getenv("DISCORD_TOKEN"))
-
 
