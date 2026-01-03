@@ -9,7 +9,6 @@ import os
 from discord.ui import View, Button
 import requests
 from bs4 import BeautifulSoup
-from datetime import datetime, timedelta
 
 
 # ======================
@@ -267,58 +266,15 @@ async def 아툴(ctx, nickname: str):
         await ctx.send("❌ 캐릭터 정보를 찾을 수 없습니다.")
         return
 
-    embed = build_aion_embed(char)
-    await ctx.send(embed=embed)
+    combat = int(char["combat_score"])
+    combat_max = int(char["combat_score_max"])
 
-# ===== 갱신
-
-def is_old_data(updated_at: str) -> bool:
-    updated_time = datetime.fromisoformat(
-        updated_at.replace("Z", "+00:00")
+    await ctx.send(
+        f"⚔️ **{char['nickname']} 전투력 정보**\n\n"
+        f"🔥 전투력: **{combat:,} / {combat_max:,}**"
+        f"정확한 전투력 측정은 사이트 갱신이 필요합니다"
+        f"사이트 바로가기 : aion2tool.com
     )
-    return datetime.utcnow() - updated_time > timedelta(hours=6)
-
-def build_aion_embed(char: dict) -> discord.Embed:
-    embed = discord.Embed(
-        title=f"⚔ {char['nickname']}",
-        color=0xA78BFA
-    )
-
-    embed.set_thumbnail(url=char["avatar_url"])
-
-    embed.add_field(
-        name="🔥 전투력",
-        value=(
-            f"**{int(char['combat_score']):,} / "
-            f"{int(char['combat_score_max']):,}**"
-        ),
-        inline=False
-    )
-
-    embed.add_field(
-        name="직업 / 서버",
-        value=f"{char['job']} / {char['server']}",
-        inline=True
-    )
-
-    updated_at = char["score_updated_at"]
-
-    embed.add_field(
-        name="데이터 갱신 시각",
-        value=updated_at.replace("T", " ").replace("Z", ""),
-        inline=False
-    )
-
-    if is_old_data(updated_at):
-        embed.add_field(
-            name="⚠ 주의",
-            value="전투력 데이터가 오래되었을 수 있습니다.\n(Aion2Tool 기준)",
-            inline=False
-        )
-
-    embed.set_footer(text="Data from aion2tool.com")
-
-    return embed
 
 
 # ======================
