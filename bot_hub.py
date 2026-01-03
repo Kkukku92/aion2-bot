@@ -1,14 +1,14 @@
 
 import discord
 from discord.ext import commands
+import datetime
+import random
+import hashlib
 import json
 import os
 from discord.ui import View, Button
 import requests
 from bs4 import BeautifulSoup
-import datetime
-import random
-import hashlib
 
 
 # ======================
@@ -406,6 +406,29 @@ async def 투표(ctx, question, *options):
 # ======================
 # !운세
 # ======================
+# ✅ 반드시 함수보다 위에
+FORTUNES = [
+    "오늘은 쓸모없는 곳에 키나를 소모할 예정"
+    "오늘은 제작이 좆망할 예정"
+    "오늘은 인던 보상이 좋을 예정"
+    "오늘은 인던 보상이 안 좋을 예정"
+    "오늘은 잠이나 자는 게 나을 예정"
+    "오늘은 갑자기 기분이 상할 예정"
+    "오늘은 운세 굳이 알려줘야 하나?"
+    "오늘은 무시받을 예정"
+    "오늘은 억까받을 예정"
+    "오늘은 쉬었음 당할 예정"
+    "오늘은 빛날 예정"
+    "오늘은 카드가 잘 뜰 예정"
+    "오늘은 축하받을 예정"
+    "오늘은 .. 흠....."
+    "오늘은 뜻밖의 행운이 찾아올 예정"
+    "오늘은 예상대로 안 흘러갈 예정"
+    "오늘은 어비스 포인트 많이 받을 예정"
+    "오늘은 공팟 운이 안 좋을 예정"
+    "오늘은 공팟 운이 좋을 예정"
+]
+
 def get_today_fortune(user_id: int):
     today = datetime.date.today().isoformat()
 
@@ -463,3 +486,4 @@ async def 도움말(ctx):
 # 봇 실행
 # ======================
 bot.run(os.getenv("DISCORD_TOKEN"))
+
