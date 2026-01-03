@@ -227,40 +227,49 @@ async def 리셋(ctx):
 async def 디시(ctx):
     await ctx.send("📌 디시인사이드 아이온2 갤러리\n👉 https://gall.dcinside.com/mgallery/board/lists/?id=aion2")
 
-@bot.command()
-async def 아툴(ctx, *, nickname: str):
-    server_id = 1005
-    url = f"https://aion2tool.com/char/serverid={server_id}/{nickname}"
+# ===== 아툴 =====
+def get_aion2_combat_power(nickname: str):
+    url = "https://aion2tool.com/api/character/search"
 
-    headers = {
-        "User-Agent": "Mozilla/5.0"
+    payload = {
+        "race": 1,
+        "server_id": 1005,
+        "keyword": nickname
     }
 
-    try:
-        response = requests.get(url, headers=headers, timeout=10)
+    headers = {
+        "User-Agent": "Mozilla/5.0",
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+    }
 
-        if response.status_code != 200:
-            await ctx.send("❌ 캐릭터 정보를 불러오지 못했습니다.")
-            return
+    res = requests.post(url, json=payload, headers=headers, timeout=10)
 
-        soup = BeautifulSoup(response.text, "html.parser")
+    if res.status_code != 200:
+        return None
 
-        power_div = soup.find("div", id="dps-score-value")
+    data = res.json()
+    if not data.get("success"):
+        return None
 
-        if not power_div:
-            await ctx.send("❌ 전투력 정보를 찾을 수 없습니다.")
-            return
+    return data["data"]
 
-        # 🔥 여기 중요
-        power = power_div.text.strip()
+@bot.command()
+async def 아툴(ctx, nickname: str):
+    char = get_aion2_combat_power(nickname)
 
-        await ctx.send(
-            f"🔍 **{nickname} 전투력**\n"
-            f"⚔️ **{power}**"
-        )
+    if not char:
+        await ctx.send("❌ 캐릭터 정보를 찾을 수 없습니다.")
+        return
 
-    except Exception as e:
-        await ctx.send("❌ 전투력 조회 중 오류가 발생했습니다.")
+    combat = int(char["combat_score"])
+    combat_max = int(char["combat_score_max"])
+
+    await ctx.send(
+        f"⚔️ **{char['nickname']} 전투력 정보**\n\n"
+        f"🔥 전투력: **{combat:,} / {combat_max:,}**"
+    )
+
 
 # ======================
 # !투표
