@@ -7,8 +7,11 @@ import hashlib
 import json
 import os
 from discord.ui import View, Button
+import asyncio
 import requests
 from bs4 import BeautifulSoup
+import time
+
 
 
 # ======================
@@ -24,6 +27,8 @@ DATA_FILE = "raid_data.json"
 
 MAX_PARTICIPANTS = 8
 MAX_RESERVE = 2
+
+refresh_cooldowns = {}  # {user_id: last_refresh_time}
 
 # ======================
 # 데이터 불러오기 / 저장
@@ -232,6 +237,75 @@ async def 디시(ctx):
     await ctx.send("📌 디시인사이드 아이온2 갤러리\n👉 https://gall.dcinside.com/mgallery/board/lists/?id=aion2")
 
 # ===== 아툴 =====
+
+# ===== 갱신 =====
+def update_aion2_character(character_id: str):
+    url = "https://aion2tool.com/api/character/update-info"
+
+    payload = {
+        "race": 1,
+        "server_id": 1005,
+        "character_id": character_id
+    }
+
+    headers = {
+        "User-Agent": "Mozilla/5.0",
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+    }
+
+    requests.post(url, json=payload, headers=headers, timeout=10)
+
+class AionRefreshView(View):
+    def __init__(self, nickname: str):
+        super().__init__(timeout=120)
+        self.nickname = nickname
+
+    @discord.ui.button(label="🔄 갱신하기", style=discord.ButtonStyle.primary)
+    async def refresh(self, interaction: discord.Interaction, button: Button):
+        user_id = interaction.user.id
+        now = time.time()
+
+        # ⏱ 쿨타임 체크 (30초)
+        last_time = refresh_cooldowns.get(user_id, 0)
+        remain = 30 - (now - last_time)
+
+        if remain > 0:
+            await interaction.response.send_message(
+                f"⏳ {int(remain)}초 후에 다시 갱신할 수 있어요.",
+                ephemeral=True
+            )
+            return
+
+        # 쿨타임 갱신
+        refresh_cooldowns[user_id] = now
+
+        await interaction.response.defer()
+
+        char = get_aion2_combat_power(self.nickname)
+        if not char:
+            await interaction.followup.send("❌ 캐릭터를 찾을 수 없습니다.", ephemeral=True)
+            return
+
+        update_aion2_character(char["character_id"])
+
+        await asyncio.sleep(1.5)
+
+        char = get_aion2_combat_power(self.nickname)
+
+        combat = int(char["combat_score"])
+        combat_max = int(char["combat_score_max"])
+
+        await interaction.message.edit(
+            content=(
+                f"⚔️ **{char['nickname']} 전투력 정보**\n\n"
+                f"🔥 전투력: **{combat:,} / {combat_max:,}**"
+            ),
+            view=self
+        )
+
+    
+# ===== 조회 =====
 def get_aion2_combat_power(nickname: str):
     url = "https://aion2tool.com/api/character/search"
 
@@ -258,6 +332,8 @@ def get_aion2_combat_power(nickname: str):
 
     return data["data"]
 
+
+
 @bot.command()
 async def 아툴(ctx, nickname: str):
     char = get_aion2_combat_power(nickname)
@@ -266,12 +342,21 @@ async def 아툴(ctx, nickname: str):
         await ctx.send("❌ 캐릭터 정보를 찾을 수 없습니다.")
         return
 
+    # 최초 갱신
+    update_aion2_character(char["character_id"])
+    await asyncio.sleep(1.5)
+
+    char = get_aion2_combat_power(nickname)
+
     combat = int(char["combat_score"])
     combat_max = int(char["combat_score_max"])
 
+    view = AionRefreshView(nickname)
+
     await ctx.send(
         f"⚔️ **{char['nickname']} 전투력 정보**\n\n"
-        f"🔥 전투력: **{combat:,} / {combat_max:,}**"
+        f"🔥 전투력: **{combat:,} / {combat_max:,}**",
+        view=view
     )
 
 
@@ -486,4 +571,5 @@ async def 도움말(ctx):
 # 봇 실행
 # ======================
 bot.run(os.getenv("DISCORD_TOKEN"))
+
 
