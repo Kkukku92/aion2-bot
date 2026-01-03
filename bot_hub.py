@@ -245,18 +245,18 @@ async def 아툴(ctx, *, nickname: str):
 
         soup = BeautifulSoup(response.text, "html.parser")
 
-        # ✅ 전투력 div (id로 정확히 찾음)
         power_div = soup.find("div", id="dps-score-value")
 
         if not power_div:
             await ctx.send("❌ 전투력 정보를 찾을 수 없습니다.")
             return
 
-        power = power_div.get_text(strip=True)
+        # 🔥 여기 중요
+        power = power_div.text.strip()
 
         await ctx.send(
-            f"🔍 **{nickname}** 전투력\n"
-            f"⚔️ `{power}`"
+            f"🔍 **{nickname} 전투력**\n"
+            f"⚔️ **{power}**"
         )
 
     except Exception as e:
