@@ -11,7 +11,7 @@ import asyncio
 import requests
 from bs4 import BeautifulSoup
 import time
-
+import functools
 
 
 # ======================
@@ -49,6 +49,13 @@ def save_data():
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 data = load_data()
+
+async def run_blocking(func, *args):
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(
+        None,
+        functools.partial(func, *args)
+    )
 
 # ======================
 # 자동 공지 체크
@@ -266,26 +273,24 @@ class AionRefreshView(View):
         user_id = interaction.user.id
         now = time.time()
 
-        # ⏱ 쿨타임 체크
         last_time = refresh_cooldowns.get(user_id, 0)
         remain = 30 - (now - last_time)
 
         if remain > 0:
-            # ⚠️ 여기서도 반드시 응답해야 함
             await interaction.response.send_message(
                 f"⏳ {int(remain)}초 후에 다시 갱신할 수 있어요.",
                 ephemeral=True
             )
             return
 
-        # ✅ 가장 먼저 응답 시작 (중요!!)
+        # 🔴 무조건 제일 먼저 defer
         await interaction.response.defer()
 
         refresh_cooldowns[user_id] = now
 
         try:
-            # 1️⃣ 캐릭터 조회
-            char = get_aion2_combat_power(self.nickname)
+            # 🔥 requests를 스레드로 실행
+            char = await run_blocking(get_aion2_combat_power, self.nickname)
             if not char:
                 await interaction.followup.send(
                     "❌ 캐릭터를 찾을 수 없습니다.",
@@ -293,19 +298,16 @@ class AionRefreshView(View):
                 )
                 return
 
-            # 2️⃣ 갱신 요청
-            update_aion2_character(char["character_id"])
+            await run_blocking(update_aion2_character, char["character_id"])
 
-            # 3️⃣ 반영 대기 (넉넉히)
+            # 서버 반영 대기
             await asyncio.sleep(5)
 
-            # 4️⃣ 다시 조회
-            char = get_aion2_combat_power(self.nickname)
+            char = await run_blocking(get_aion2_combat_power, self.nickname)
 
             combat = int(char["combat_score"])
             combat_max = int(char["combat_score_max"])
 
-            # 5️⃣ 메시지 수정
             await interaction.message.edit(
                 content=(
                     f"⚔️ **{char['nickname']} 전투력 정보**\n\n"
@@ -315,11 +317,12 @@ class AionRefreshView(View):
             )
 
         except Exception as e:
+            print("갱신 오류:", e)
             await interaction.followup.send(
                 "⚠️ 갱신 중 오류가 발생했습니다.",
                 ephemeral=True
             )
-            print("갱신 오류:", e)
+
 
     
 # ===== 조회 =====
