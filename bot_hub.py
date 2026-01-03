@@ -266,43 +266,60 @@ class AionRefreshView(View):
         user_id = interaction.user.id
         now = time.time()
 
-        # ⏱ 쿨타임 체크 (30초)
+        # ⏱ 쿨타임 체크
         last_time = refresh_cooldowns.get(user_id, 0)
         remain = 30 - (now - last_time)
 
         if remain > 0:
+            # ⚠️ 여기서도 반드시 응답해야 함
             await interaction.response.send_message(
                 f"⏳ {int(remain)}초 후에 다시 갱신할 수 있어요.",
                 ephemeral=True
             )
             return
 
-        # 쿨타임 갱신
-        refresh_cooldowns[user_id] = now
-
+        # ✅ 가장 먼저 응답 시작 (중요!!)
         await interaction.response.defer()
 
-        char = get_aion2_combat_power(self.nickname)
-        if not char:
-            await interaction.followup.send("❌ 캐릭터를 찾을 수 없습니다.", ephemeral=True)
-            return
+        refresh_cooldowns[user_id] = now
 
-        update_aion2_character(char["character_id"])
+        try:
+            # 1️⃣ 캐릭터 조회
+            char = get_aion2_combat_power(self.nickname)
+            if not char:
+                await interaction.followup.send(
+                    "❌ 캐릭터를 찾을 수 없습니다.",
+                    ephemeral=True
+                )
+                return
 
-        await asyncio.sleep(1.5)
+            # 2️⃣ 갱신 요청
+            update_aion2_character(char["character_id"])
 
-        char = get_aion2_combat_power(self.nickname)
+            # 3️⃣ 반영 대기 (넉넉히)
+            await asyncio.sleep(5)
 
-        combat = int(char["combat_score"])
-        combat_max = int(char["combat_score_max"])
+            # 4️⃣ 다시 조회
+            char = get_aion2_combat_power(self.nickname)
 
-        await interaction.message.edit(
-            content=(
-                f"⚔️ **{char['nickname']} 전투력 정보**\n\n"
-                f"🔥 전투력: **{combat:,} / {combat_max:,}**"
-            ),
-            view=self
-        )
+            combat = int(char["combat_score"])
+            combat_max = int(char["combat_score_max"])
+
+            # 5️⃣ 메시지 수정
+            await interaction.message.edit(
+                content=(
+                    f"⚔️ **{char['nickname']} 전투력 정보**\n\n"
+                    f"🔥 전투력: **{combat:,} / {combat_max:,}**"
+                ),
+                view=self
+            )
+
+        except Exception as e:
+            await interaction.followup.send(
+                "⚠️ 갱신 중 오류가 발생했습니다.",
+                ephemeral=True
+            )
+            print("갱신 오류:", e)
 
     
 # ===== 조회 =====
