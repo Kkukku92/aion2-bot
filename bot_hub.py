@@ -1,3 +1,4 @@
+
 import discord
 from discord.ext import commands
 import json
@@ -5,6 +6,9 @@ import os
 from discord.ui import View, Button
 import requests
 from bs4 import BeautifulSoup
+import datetime
+import random
+import hashlib
 
 
 # ======================
@@ -399,6 +403,28 @@ async def 투표(ctx, question, *options):
         view=view
     )
 
+# ======================
+# !운세
+# ======================
+def get_today_fortune(user_id: int):
+    today = datetime.date.today().isoformat()
+
+    seed_str = f"{user_id}-{today}"
+    seed = int(hashlib.sha256(seed_str.encode()).hexdigest(), 16)
+
+    random.seed(seed)
+
+    fortune = random.choice(FORTUNES)
+    return fortune
+
+@bot.command()
+async def 운세(ctx):
+    fortune = get_today_fortune(ctx.author.id)
+
+    await ctx.send(
+        f"🔮 **{ctx.author.display_name}님의 오늘의 운세**\n\n"
+        f"✨ {fortune}"
+    )
 
 
 # ======================
@@ -428,6 +454,7 @@ async def 도움말(ctx):
 [유틸]
 !디시 - 아이온2 갤러리
 !아툴 닉네임 - 자신의 아툴 전투력 검색 (현재유스티엘서버만가능)
+!운세 - 운세
 
 ※ 확정 8명 + 일정 등록 시 자동 공지됩니다.
 """)
@@ -436,4 +463,3 @@ async def 도움말(ctx):
 # 봇 실행
 # ======================
 bot.run(os.getenv("DISCORD_TOKEN"))
-
