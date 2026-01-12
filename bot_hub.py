@@ -453,6 +453,21 @@ async def 운세(ctx):
 
 
 # ======================
+# !확정초기화 (관리자)
+# ======================
+@bot.command()
+@commands.has_permissions(administrator=True)
+async def 확정초기화(ctx):
+    if not data["participants"]:
+        await ctx.send("⚠️ 현재 확정 인원이 없습니다.")
+        return
+
+    data["participants"] = []
+    data["announced"] = False
+    save_data()
+
+    await ctx.send("♻ **확정 인원이 초기화되었습니다.**\n예비 인원과 일정은 유지됩니다.")
+# ======================
 # !도움말
 # ======================
 @bot.command()
@@ -472,6 +487,7 @@ async def 도움말(ctx):
 !일정 - 레이드 일정 확인
 !일정추가 [내용] - 일정 등록 (관리자)
 !일정삭제 - 일정 삭제 (관리자)
+!확정초기화 - 레이드초기화 (관리자)
 
 [관리]
 !청소 - 채팅 삭제 (관리자)
@@ -488,4 +504,5 @@ async def 도움말(ctx):
 # 봇 실행
 # ======================
 bot.run(os.getenv("DISCORD_TOKEN"))
+
 
